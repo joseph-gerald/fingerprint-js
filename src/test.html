@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="favicon.png">
+    <title>Test</title>
+</head>
+
+<body>
+    <script>
+        // Math Utils
+        function getDeviation(nums) {
+            if (nums.length === 0) return 0;
+
+            return Math.sqrt(Math.abs((getVariance(nums) / nums.length - 1)));
+        }
+
+        function getAverage(nums) {
+            if (nums.length === 0) return 0;
+
+            return getSum(nums) / nums.length;
+        }
+
+        function getSum(nums) {
+            if (nums.length === 0) return 0;
+
+            return nums.reduce((a, b) => a + b, 0);
+        }
+
+        function getVariance(data) {
+            if (data.length === 0) return 0;
+
+            const mean = data.reduce((a, b) => a + b, 0) / data.length;
+            return data.reduce((a, b) => a + Math.pow(b - mean, 2), 0);
+        }
+    </script>
+    <script>
+        const samples = [];
+        const buffer = {
+            rounded: 0,
+        }
+
+        function MoveData(event) {
+            return {
+                timestamp: Date.now(),
+                /*
+                altKey: event.altKey,
+                shiftKey: event.shiftKey,
+                bubbles: event.bubbles,
+                */
+                layerX: event.layerX,
+                layerY: event.layerY,
+                pageX: event.pageX,
+                pageY: event.pageY,
+                screenX: event.screenX,
+                screenY: event.screenY,
+                movementX: event.movementX,
+                movementY: event.movementY
+            }
+        }
+
+        function Statistic(sampleSize, prop) {
+            const data = samples.map(_ => _[prop]).slice(-sampleSize);
+            const sum = getSum(data);
+            const average = getAverage(data);
+            const median = data[Math.floor(sampleSize / 2)];
+            const deviation = getDeviation(data);
+
+            return {
+                sum: sum,
+                average: average,
+                median: median,
+                deviation: deviation,
+                size: sampleSize
+            }
+        }
+
+        function roundedCheck(statistic) {
+            const no_deviation = getAverage(structuredClone(statistic).map(_ => _.deviation)) < 0.9;
+            const changed = getAverage(structuredClone(statistic).map(_ => _.average)) > 5;
+            const average_variance = getVariance(structuredClone(statistic).map(_ => _.average));
+            const median_variance = getVariance(structuredClone(statistic).map(_ => _.median));
+            const deviation_sum = getSum(structuredClone(statistic).map(_ => _.deviation));
+            const devious_deviance = statistic.map(_ => Math.abs(_.median) - Math.abs(_.average) > 0).reduce((a, b) => a + b) == Object.keys(statistic).length;
+
+            const failed = changed && (
+                average_variance % 1 == 0 &&
+                median_variance % 1 == 0 &&
+                !devious_deviance
+            );
+
+            if (failed) {
+                buffer.rounded++;
+            } else if (buffer.rounded > 0) {
+                buffer.rounded -= 0.5;
+            }
+
+            console.log(buffer.rounded)
+
+            return failed && buffer.rounded > 3;
+        }
+
+        function missingCheck(statistic) {
+            const no_deviation = getAverage(structuredClone(statistic).map(_ => _.deviation)) < 0.9;
+            const changed = getAverage(structuredClone(statistic).map(_ => _.average)) > 5;
+            const average_variance = getVariance(structuredClone(statistic).map(_ => _.average));
+            const median_variance = getVariance(structuredClone(statistic).map(_ => _.median));
+            const deviation_sum = getSum(structuredClone(statistic).map(_ => _.deviation));
+            const devious_deviance = statistic.map(_ => Math.abs(_.median) - Math.abs(_.average) > 0).reduce((a, b) => a + b) == Object.keys(statistic).length;
+
+            return !changed && (
+                average_variance < 2000 &&
+                median_variance > 20000 &&
+                devious_deviance
+            )
+        }
+
+        function linearCheck(statistic) {
+            const no_deviation = getAverage(structuredClone(statistic).map(_ => _.deviation)) < 0.9;
+            const changed = getAverage(structuredClone(statistic).map(_ => _.average)) > 5;
+            const average_variance = getVariance(structuredClone(statistic).map(_ => _.average));
+            const median_variance = getVariance(structuredClone(statistic).map(_ => _.median));
+            const deviation_sum = getSum(structuredClone(statistic).map(_ => _.deviation));
+
+            return changed && (
+                no_deviation &&
+                average_variance < 0.01 &&
+                median_variance < 0.01
+            )
+        }
+
+        function snapCheck(statistic) {
+            const changed = getAverage(structuredClone(statistic).map(_ => _.average)) > 3;
+            const deviation_average = getAverage(structuredClone(statistic).map(_ => _.deviation));
+            const median_average = getAverage(structuredClone(statistic).map(_ => _.median));
+            const abs_median_average = getAverage(structuredClone(statistic).map(_ => Math.abs(_.median)));
+
+            const failed = (
+                deviation_average > 100 &&
+                Math.abs(median_average) < 2 &&
+                abs_median_average < 20
+            );
+
+            return failed;
+        }
+
+        function dev(statistic) {
+            const changed = getAverage(structuredClone(statistic).map(_ => _.average)) > 3;
+            const deviation_average = getAverage(structuredClone(statistic).map(_ => _.deviation));
+            const median_average = getAverage(structuredClone(statistic).map(_ => _.median));
+            const abs_median_average = getAverage(structuredClone(statistic).map(_ => Math.abs(_.median)));
+
+        }
+
+        function addData(name, data, add) {
+            const inner = `
+            
+            <h2 style="margin: 0;">${name}</h2>
+                ${data}
+                `
+            const template = `
+            <div class="statistic" id="${name}">
+                ${inner}
+            </div>
+            `
+
+            if (add) document.getElementById("dataX").innerHTML += template;
+            return inner;
+        }
+
+        let tick = 0;
+
+        document.addEventListener("mousemove", (event) => {
+            tick++;
+            const data = new MoveData(event);
+            const last2 = new Statistic(2, "movementX");
+            const last5 = new Statistic(5, "movementX");
+            const last10 = new Statistic(10, "movementX");
+            const last20 = new Statistic(20, "movementX");
+            const last100 = new Statistic(100, "movementX");
+
+            const statistics = [last2, last5];
+
+            const checks = [linearCheck, snapCheck, missingCheck, roundedCheck];
+
+            for (check of checks) {
+                if (check(statistics)) {
+                    console.warn("FAILED: " + check.name)
+                    console.info("VERBOSE: ", statistics)
+                    addFail(check.name, JSON.stringify(statistics))
+                }
+            }
+
+            samples.push(data)
+
+            for (statistic of [last2, last5, last10, last20, last100]) {
+                const name = "LAST " + statistic.size;
+                const elm = document.getElementById(name);
+                if (!elm) {
+                    addData(name, "BUILDING SAMPLES", true)
+                }
+
+                if (tick % statistic.size != 0) continue;
+
+                if (elm) {
+                    elm.innerHTML = addData(name, JSON.stringify(statistic), false);
+                } else {
+                    addData(name, JSON.stringify(statistic), true)
+                }
+            }
+        })
+    </script>
+    <style>
+        body {
+            background: #090909;
+            color: white;
+            font-family: monospace;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            overflow-x: hidden;
+        }
+
+        #data,
+        #logs {
+            display: flex;
+            flex-direction: column;
+            overflow-y: scroll;
+        }
+
+        .statistic,
+        .log {
+            background-color: rgba(40, 10, 20, 0.2);
+            padding: 10px;
+            margin: 10px;
+            width: calc(100% - 45px);
+        }
+
+        .statistic {
+            background-color: rgba(50, 40, 100, 0.2);
+        }
+
+        .verbose {
+            background-color: rgba(40, 10, 40, 0.1);
+            padding: 5px;
+        }
+
+        .verbose_text {
+            background-color: rgba(40, 10, 20, 0.2);
+            margin: 5px 0;
+            padding: 5px;
+        }
+
+        .left {
+            width: 100%;
+            ;
+        }
+
+
+        .right {
+            width: 100%;
+            height: 100%;
+            border-left: rgba(255, 255, 255, 0.5) 1px solid;
+        }
+
+        .content {
+            display: flex;
+        }
+
+        .title {
+            margin-left: 25px;
+        }
+
+        #dataX {
+            background-color: rgba(50, 40, 100, 0.2);
+            padding: 10px;
+            ;
+        }
+
+        #dataY {
+            background-color: rgba(50, 100, 40, 0.2);
+            padding: 10px;
+            ;
+        }
+    </style>
+    <div id="mouse-follower">🖱️</div>
+    <script>
+        document.addEventListener('contextmenu', event => {
+            event.preventDefault();
+        });
+
+        function addFail(checkName, verbose) {
+            const template = `
+        <div class="log">
+            <h2 style="margin: 0;">Failed on ${checkName}</h2>
+            <hr style="color: white; border: none; height: 1px; background-color: rgba(255,255,255,0.5);">
+            <div class="verbose">
+                <h3 style="margin: 0;">VERBOSE</h3>
+                <div class="verbose_text">
+                    ${verbose}
+                </div>
+            </div>
+        </div>
+        `
+            document.getElementById("logs").innerHTML += template;
+        }
+    </script>
+    <div class="content">
+        <div class="left">
+            <h1 class="title">INFO</h1>
+            <hr>
+            <div id="data">
+                <div id="dataX">
+                    <h2 style="margin: 0;">DeltaMouseX Debug</h2>
+                </div>
+                <div id="dataY">
+                    <h2 style="margin: 0;">DeltaMouseY Debug</h2>
+                </div>
+            </div>
+        </div>
+        <div class="right">
+            <h1 class="title">LOGS</h1>
+            <hr>
+            <div id="logs">
+
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
